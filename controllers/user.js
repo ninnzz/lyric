@@ -10,7 +10,7 @@ user = function(kiel){
 		
 		/*** IMPORTANT ***/
 		// for new projects that wants to use the user class, add your own custom user implementation here
-		// you can create or use the existing user function just redefine the fields of your user obeject
+		// you can create or use the existing user function just redefine the fields of your user object
 
 		usr['profile_info'] 	= {custom_url : "", avatar : "", paypal : ""};
 		usr['contact_info'] 	= {phone : [], twitter : "", facebook : ""};

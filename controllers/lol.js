@@ -1,7 +1,7 @@
 var lol
 	, db = require(__dirname + "/../helpers/ndb")
 	, curl = require('request')
-	, d = new Date();
+	, d = new Date('2014-04-02');
 
 lol = function(kiel){
 
@@ -40,9 +40,11 @@ lol = function(kiel){
 		, league_by_summoner_entry = "https://prod.api.pvp.net/api/lol/{r}/v2.3/league/by-summoner/{u}/entry?api_key="+api_key
 		, recent_games = "https://prod.api.pvp.net/api/lol/{r}/v1.3/game/by-summoner/{u}/recent?api_key="+api_key
 		get_sbsr = function(arr) {
+			console.log('sbrs pass');
 			arr.forEach(function(val){
 				var url =  (stats_by_summoner_ranked.replace('{u}',val.id)).replace('{r}',val.region);
 				curl(url ,function(err,rs,body){
+					console.log(err);
 					if(!err && rs.statusCode == 200){
 						body = JSON.parse(body);
 						body['user_id'] = val.id;
@@ -57,9 +59,11 @@ lol = function(kiel){
 			});
 		},
 		get_sbss = function(arr) {
+			console.log('sbss pass');		
 			arr.forEach(function(val){
 				var url =  (stats_by_summoner_summary.replace('{u}',val.id)).replace('{r}',val.region);
 				curl(url ,function(err,rs,body){
+					console.log(err);
 					if(!err && rs.statusCode == 200){
 						body = JSON.parse(body);
 						body['user_id'] = val.id;
@@ -85,6 +89,7 @@ lol = function(kiel){
 						body['user_id'] = val.id;
 						body['created_at'] = d.getTime();
 						db._instance().collection('summoner', function(err,_collection) {
+							console.log('DB err'+err);
 							if(!err){
 								_collection.insert(body,function(err){kiel.logger(d.getTime()+' Failed to mine:'+err,'steam_debug')});
 							}
@@ -94,9 +99,11 @@ lol = function(kiel){
 			});
 		},
 		get_summoner_masteries = function(arr) {
+			console.log('masteries pass');
 			arr.forEach(function(val){
 				var url =  (summoner_masteries.replace('{u}',val.id)).replace('{r}',val.region);
 				curl(url ,function(err,rs,body){
+					console.log(err);
 					if(!err && rs.statusCode == 200){
 						body = JSON.parse(body);
 						body['user_id'] = val.id;
@@ -111,9 +118,11 @@ lol = function(kiel){
 			});
 		},
 		get_summoner_runes = function(arr) {
+			console.log('runes pass');		
 			arr.forEach(function(val){
 				var url =  (summoner_runes.replace('{u}',val.id)).replace('{r}',val.region);
 				curl(url ,function(err,rs,body){
+					console.log(err);
 					if(!err && rs.statusCode == 200){
 						body = JSON.parse(body);
 						body['user_id'] = val.id;
@@ -155,6 +164,7 @@ lol = function(kiel){
 						body['user_id'] = val.id;
 						body['created_at'] = d.getTime();
 						db._instance().collection('league_by_summoner', function(err,_collection) {
+							console.log('DB err'+err);
 							if(!err){
 								_collection.insert(body,function(err){kiel.logger(d.getTime()+' Failed to mine:'+err,'steam_debug')});
 							}
@@ -173,6 +183,7 @@ lol = function(kiel){
 						body['user_id'] = val.id;
 						body['created_at'] = d.getTime();
 						db._instance().collection('league_by_summoner_entry', function(err,_collection) {
+							console.log('DB err'+err);
 							if(!err){
 								_collection.insert(body,function(err){kiel.logger(d.getTime()+' Failed to mine:'+err,'steam_debug')});
 							}
@@ -201,33 +212,51 @@ lol = function(kiel){
 		};
 	return {
 		get : {
+			fetch : function(req,res) {
+				var col = 'recent_games';
+				db._instance().collection(col,function(err,_collection) {
+					if(err) { kiel.response(req, res, {data : err}, 500);return;}
+					_collection.find().toArray(function(err,d){
+						if(err) { kiel.response(req, res, {data : err}, 500);return;}
+
+						kiel.response(req,res,{data:d},200);
+						return;
+
+					});
+				});
+
+			},
 			overview : function(req,res) {
 				get_sbsr(user_ids1);
-				setTimeout(function(){get_sbss(user_ids1);},15000);
-				setTimeout(function(){get_summoner_runes(user_ids1);},30000);
-				setTimeout(function(){get_summoner_masteries(user_ids1);},45000);
+				setTimeout(function(){get_sbss(user_ids1);},20000);
+				setTimeout(function(){get_summoner_runes(user_ids1);},40000);
+				setTimeout(function(){get_summoner_masteries(user_ids1);},60000);
+				setTimeout(function(){get_sbsr(user_ids2);},80000);
+				setTimeout(function(){get_sbss(user_ids2);},100000);
+				setTimeout(function(){get_summoner_runes(user_ids2);},120000);
+				setTimeout(function(){get_summoner_masteries(user_ids1);},140000);
 
 				kiel.response(req,res,{data:"Processing data mining for Leauge of Legends, this might take some time :)"},200);
 			} ,
 			teams : function(req,res) {
 				get_team_by_summoner(user_ids1);
-				setTimeout(function(){get_team_by_summoner(user_ids2);},15000);
+				setTimeout(function(){get_team_by_summoner(user_ids2);},20000);
 				kiel.response(req,res,{data:"Processing data mining for Leauge of Legends [teams], this might take some time :)"},200);
 			},
 			summoner : function(req,res) {
 				get_summoner(user_ids1);
-				setTimeout(function(){console.log('2nd summoner');get_summoner(user_ids2);},15000);
+				setTimeout(function(){console.log('2nd summoner');get_summoner(user_ids2);},20000);
 				kiel.response(req,res,{data:"Processing data mining for Leauge of Legends [summoner], this might take some time :)"},200);	
 			},
 			league : function(req,res) {
 				get_league_by_summoner(user_ids1);
-				setTimeout(function(){console.log('2nd league set');get_league_by_summoner(user_ids2);},15000);
-				kiel.response(req,res,{data:"Processing data mining for Leauge of Legends [summoner], this might take some time :)"},200);	
+				setTimeout(function(){console.log('2nd league set');get_league_by_summoner(user_ids2);},20000);
+				kiel.response(req,res,{data:"Processing data mining for Leauge of Legends [league], this might take some time :)"},200);	
 			},
 			league_entry : function(req,res) {
 				get_league_by_summoner_entry(user_ids1);
 				setTimeout(function(){console.log('2nd league set');get_league_by_summoner_entry(user_ids2);},15000);
-				kiel.response(req,res,{data:"Processing data mining for Leauge of Legends [summoner], this might take some time :)"},200);	
+				kiel.response(req,res,{data:"Processing data mining for Leauge of Legends [league_entry], this might take some time :)"},200);	
 			},
 			recent_games : function(req,res) {	
 				get_summoner_recent_games(user_ids1);
