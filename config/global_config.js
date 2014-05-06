@@ -3,15 +3,15 @@ var config = {
 	"production"	: {
 		"port"	: 80,
 		"logs"	: "logs/",
-		"domain"	: "http://lyric.engine"
+		"domain"	: "http://auth.kielrsl"
 	},
 	"staging"	: {
-		"port"	: 3001,
+		"port"	: 3000,
 		"logs"	: "logs/",
 		"domain"	: "http://localhost"
 	},
 	"development" : {
-		"port"	: 3001,
+		"port"	: 3000,
 		"logs"	: "logs/",
 		"domain"	: "http://localhost"
 	}

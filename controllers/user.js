@@ -7,22 +7,23 @@ user = function(kiel){
 	var input_user = function(req,res,app) {
 		var usr = {}
 			, d = new Date();
-		
+				
 		/*** IMPORTANT ***/
 		// for new projects that wants to use the user class, add your own custom user implementation here
 		// you can create or use the existing user function just redefine the fields of your user object
 
+
 		usr['profile_info'] 	= {custom_url : "", avatar : "", paypal : ""};
 		usr['contact_info'] 	= {phone : [], twitter : "", facebook : ""};
 		usr.contact_info['address'] = {};
-		usr[app.name+'_data']	= {user_scope : app.basic_scopes};
+		usr[app._id+'_data']	= {user_scope : app.basic_scopes};
 		
 		req.post_args.email 		&& (usr['email'] = req.post_args.email );
 		req.post_args.password 		&& (usr['password'] = kiel.utils.hash(kiel.utils.hash(req.post_args.password) + kiel.application_config.salt)  );
 		req.post_args.fname 		&& (usr.profile_info['fname'] = req.post_args.fname );
 		req.post_args.lname 		&& (usr.profile_info['lname'] = req.post_args.lname );
 		req.post_args.avatar 		&& (usr.profile_info['avatar'] = req.post_args.avatar );
-		req.post_args.birthday 		&& (usr.profile_info['birthdate'] = req.post_args.birthdate );
+		req.post_args.birthdate 		&& (usr.profile_info['birthdate'] = req.post_args.birthdate );
 		req.post_args.skype 		&& (usr.contact_info['skype'] = req.post_args.skype );
 		req.post_args.google_refresh_token 	&& (usr['google_refresh_token'] = req.post_args.google_refresh_token );
 		req.post_args.street_address		&& (usr.contact_info.address['street_address'] = req.post_args.street_address );
@@ -83,9 +84,10 @@ user = function(kiel){
 		get : {
 			index : function(req,res) {
 				var rqrd = ['access_token']
-					,scopes;
-				if(!kiel.utils.required_fields(rqrd,req.get_args)){
-					kiel.response(req, res, {data : "Missing fields"}, 500);
+					,scopes
+					, rst;
+				if(!(rst = kiel.utils.required_fields(rqrd,req.get_args)).stat){
+					kiel.response(req, res, {data : "Missing fields ["+rst.field+']'}, 500);
 					return;
 				}
 				((req.get_args.self && (scopes = ['self.view'])) || (scopes = ['user.view']) );
@@ -116,7 +118,8 @@ user = function(kiel){
 
 		post : {
 			register : function(req,res) {
-				var rqrd = ['email','password','app_id','fname','lname','birthdate'];
+				var rqrd = ['email','password','app_id','fname','lname','birthdate']
+					, rst;
 				if(!kiel.utils.required_fields(rqrd,req.post_args)){
 					kiel.response(req, res, {data : "Missing fields"}, 500);
 					return;
@@ -140,19 +143,21 @@ user = function(kiel){
 		}, 
 
 		put : {
-			/***TODO***/
-			// Will add the editable function for each use model later.
 			index : function(req,res) {
-				var rqrd = ['user_id','access_token'];
-				if(!kiel.utils.required_fields(rqrd,req.put_args)){
-					kiel.response(req, res, {data : "Missing fields"}, 500);
+				var rqrd = ['access_token']
+					, user_id
+					, rst;
+				if(!(rst = kiel.utils.required_fields(rqrd,req.put_args)).stat){
+					kiel.response(req, res, {data : "Missing fields ["+rst.field+']'}, 500);
 					return;
 				}
-				kiel.utils.has_scopes(['self.edit','web.view'],req.put_args.access_token,function(err){
-					if(err){ kiel.response(req, res, {data : err.message}, err.rsponse_code); return; }	
+				//checks the access token to proper edit mapping. Allows user to only edit themselves
+				kiel.utils.has_scopes(['self.edit','self.view'],req.put_args.access_token,function(err,data){
+					if(err){ kiel.response(req, res, {data : err.message}, err.response_code); return; }	
+					user_id = data.user_id;
 					db._instance().collection('users',function(err,_collection){
 						if(err) {callback({message:err,response_code:500});return;}
-						_collection.find({_id:req.put_args.user_id}).toArray(function(err,user) {
+						_collection.find({_id:user_id}).toArray(function(err,user) {
 							if(err) { kiel.response(req, res, {data : err}, 500);return;}
 							if(user.length === 0) {
 								kiel.response(req, res, {data : "User not found."}, 404);
@@ -166,7 +171,7 @@ user = function(kiel){
 								req.put_args.avatar 			&& (usr.profile_info['avatar'] = req.put_args.avatar );
 								req.put_args.paypal 			&& (usr.profile_info['paypal'] = req.put_args.paypal );
 								req.put_args.custom_url 		&& (usr.profile_info['custom_url'] = req.put_args.custom_url );
-								req.put_args.birthday 			&& (usr.profile_info['birthdate'] = req.put_args.birthdate );
+								req.put_args.birthdate 			&& (usr.profile_info['birthdate'] = req.put_args.birthdate );
 								req.put_args.skype 				&& (usr.contact_info['skype'] = req.put_args.skype );
 								req.put_args.facebook 			&& (usr.contact_info['facebook'] = req.put_args.facebook );
 								req.put_args.twitter 			&& (usr.contact_info['twitter'] = req.put_args.twitter );
@@ -180,7 +185,7 @@ user = function(kiel){
 								req.put_args.referrer			&& (usr['referrer'] = req.put_args.referrer );
 								usr.profile_info['updated_at'] = dt.getTime();
 								
-								_collection.update({_id:req.put_args.user_id}, usr,function(err,d) {
+								_collection.update({_id:user_id}, usr,function(err,d) {
 									if(err) { kiel.response(req, res, {data : err}, 500);return;}
 									if(d === 1) {
 										var ret = {

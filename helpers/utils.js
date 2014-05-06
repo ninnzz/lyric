@@ -8,11 +8,13 @@ var crypto = require('crypto')
 	
 exports.required_fields = function(required,fields)
 {
+	// console.log(fields);
 	for(var req in required){
-		if(!fields.hasOwnProperty(required[req]))
-			return false;
+		if(!fields.hasOwnProperty(required[req]) || fields[required[req]] == ''){
+			return {field:required[req], stat:false};
+		}
 	}
-	return true;
+	return {stat:true};
 };
 
 exports.hash = function (string, hash) {
@@ -71,7 +73,6 @@ exports.has_scopes = function(scope,access_token,callback) {
 									callback(null,d[0]);
 									return;
 								})
-
 							});
 						} else {
 							callback({message:'Invalid access_token. Access_token app_id mismatch.',response_code:400});

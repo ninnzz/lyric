@@ -4,6 +4,10 @@ var auth
 
 
 
+	/*** IMPORTANT ***/
+	// by default, kielrsl-node stores your user data to the collection 'users'
+	// if you want to use the implementation of oauth, kidnly follow the oauth procedure of the framework
+
 auth = function(kiel){
 
 	var login_check = function(req,res,app){
@@ -19,7 +23,7 @@ auth = function(kiel){
 				}
 				(req.post_args.password || req.post_args.google_access_token) && (crdntls = {email:req.post_args.email});
 				slctbl = {"email":1,"profile_info":1,"password":1,"google_access_token":1,"email_confirmed":1,"is_system_admin":1,"google_credentials":1,"contact_info":1};
-				slctbl[app.name+'_data'] = 1;
+				slctbl[app._id+'_data'] = 1;
 				
 				if(Object.keys(crdntls).length === 0)
 					throw "Invalid credentials for login.";
@@ -31,8 +35,6 @@ auth = function(kiel){
 					}
 					if(d.length === 1) {
 						req.post_args.source === "self" && d[0].password !== kiel.utils.hash(kiel.utils.hash(req.post_args.password) + kiel.application_config.salt) && (er = "Password does not match.");
-						console.log(er);
-						console.log(req.post_args.source === "self" && d[0].password !== kiel.utils.hash(kiel.utils.hash(req.post_args.password) + kiel.application_config.salt) && (er = "Password does not match."));
 						if(er){
 							kiel.response(req, res, {data : er}, 400);
 							return;
@@ -46,9 +48,9 @@ auth = function(kiel){
 										return;
 									} else {
 										//add app if user of new app
-										if(!d[0][app.name+'_data']) {
+										if(!d[0][app._id+'_data']) {
 											add_app(_collection,app,d[0]);
-											d[0][app.name+'_data'] = {user_scopes:app.basic_scopes};
+											d[0][app._id+'_data'] = {user_scopes:app.basic_scopes};
 										}
 										delete d[0].password;
 										delete d[0].google_access_token;
@@ -64,9 +66,9 @@ auth = function(kiel){
 							});
 						} else {
 							//add app if user of new app
-							if(!d[0][app.name+'_data']) {
+							if(!d[0][app._id+'_data']) {
 								add_app(_collection,app,d[0]);
-								d[0][app.name+'_data'] = {user_scopes:app.basic_scopes};
+								d[0][app._id+'_data'] = {user_scopes:app.basic_scopes};
 							}
 							delete d[0].password;
 							delete d[0].google_access_token;
@@ -82,26 +84,26 @@ auth = function(kiel){
 		, add_app = function(user_collection,app,user) {
 			console.log('added new scopes');
 			var crd = {};
-			crd[app.name+'_data'] = {user_scopes:app.basic_scopes};
+			crd[app._id+'_data'] = {user_scopes:app.basic_scopes};
 			user_collection.update({_id:user._id}, {'$set':crd},function(err,d) {
 				console.log(err);
 				console.log(d);
 			});
 		}
-		, find_app = function(err,req,res,app_id,cb) {
+		, find_app = function(err,req,res,data,cb) {
 			db._instance().collection('app',function(err,_collection){
 				if(err) {
 					kiel.response(req, res, {data : err}, 500);
 					return;
 				}
-				_collection.find({_id:app_id}).toArray(function(err,d){
+				_collection.find({_id:data.app_id}).toArray(function(err,d){
 					if(err) {
 						kiel.response(req, res, {data : err}, 500);
 						return;
 					}
 					if(d.length === 1) {
 						try{
-							cb(req,res,d[0]);
+							cb(req,res,d[0],data);
 						} catch (err) {
 							kiel.response(req, res, {data : err}, 500);
 						}
@@ -146,8 +148,9 @@ auth = function(kiel){
 						if(req.get_args.scope_token === kiel.utils.hash(req.get_args.app_id+'-'+app.secret)){
 							try {
 								var scps = [];
+								//put trim on scopes here
 								(req.get_args.scopes.split(',')).forEach(function(sc) {
-									scps.push({scope: req.get_args.scope_token+'.'+sc });
+									scps.push({scope: req.get_args.scope_token+'.'+sc.trim() });
 								});
 
 								db._instance().collection('scopes',function(err,_collection) {
@@ -193,7 +196,7 @@ auth = function(kiel){
 				};
 
 			request_token.scopes.forEach(function(sc) {
-				oauth_scopes.push({'access_token': access_token.access_token,'app_id':access_token.app_id, 'scope':sc.scope,'created_at':dt.getTime()});
+				oauth_scopes.push({_id:kiel.utils.hash(access_token.access_token+sc.scope),'access_token': access_token.access_token,'app_id':access_token.app_id, 'scope':sc.scope,'created_at':dt.getTime()});
 			});
 			_collection.insert(access_token,function(err) {
 				if(err) {
@@ -226,10 +229,7 @@ auth = function(kiel){
 		}
 		, save_access_token = function(req,res,request_token) {
 			db._instance().collection('access_tokens',function(err,_collection) {
-				if(err) {
-					kiel.response(req, res, {data : err}, 500);
-					return;
-				}	
+				if(err) {kiel.response(req, res, {data : err}, 500);return;}	
 				_collection.find({user_id:req.get_args.user_id}).toArray(function(err,d) {
 					if(err) {
 						kiel.response(req, res, {data : err}, 500);
@@ -299,6 +299,48 @@ auth = function(kiel){
 
 				});
 			});
+		}
+		, add_scopes = function(req,res,app,data) {
+			var scps = []
+				, oauth_scopes = []
+				, dt = new Date();
+
+
+			// db._instance().collection('scopes',function(err,_collection) {
+			// 	if(err) {
+			// 		kiel.response(req, res, {data : err}, 500);
+			// 		return;
+			// 	}
+			// 	_collection.find({$or:scps}).toArray(function(err,d){
+			// 		if(err) {
+			// 			kiel.response(req, res, {data : err}, 500);
+			// 			return;
+			// 		}
+			// 		if(d.length === scps.length) {
+			// 			var d = new Date();
+			// 			save_request_token(req,res,{request_token: kiel.utils.hash(d.getTime())+kiel.utils.random(),user_id: req.get_args.user_id,app_id:req.get_args.app_id,scopes:scps,created_at:d.getTime(),expires:d.getTime()+60*60*1000});
+			// 		} else {
+			// 			kiel.response(req, res, {data : "Error in validating scopes"}, 400);									
+			// 		}
+			// 	});
+			// });
+			// add this code later once we have complete set of scopes
+
+			(data.scopes.split(',')).forEach(function(sc) {
+				if(sc.trim() !== '')
+					scps.push({scope: app.scope_token+'.'+sc.trim() });
+			});
+			scps.forEach(function(sc) {
+				oauth_scopes.push({_id:kiel.utils.hash(data.access_token+sc.scope),'access_token': data.access_token,'app_id':data.app_id, 'scope':sc.scope,'created_at':dt.getTime()});
+			});
+			db._instance().collection('oauth_session_scopes',function(err,_collection){
+				if(err) { kiel.response(req, res, {data : "Something went wrong while adding scopes:"+err}, 500);return;}
+				_collection.insert(oauth_scopes,{continueOnError: true, safe: true},function(err){
+					// if(err) { kiel.response(req, res, {data:'Failed saving oauth_scopes: '+err},500);return;}
+					kiel.response(req, res, {data:data,scopes_added:scps},200);
+					return;
+				});
+			});
 		};
 
 	return {
@@ -318,48 +360,54 @@ auth = function(kiel){
 				kiel.response(req, res, {data :h, date: new Date().getTime(),pass:p}, 200);
 			} ,
 			request_token : function(req,res) {
-				var rqrd = ['app_id','scopes','user_id','scope_token'];
-				if(!kiel.utils.required_fields(rqrd,req.get_args)) {
-					kiel.response(req, res, {data : "Missing fields"}, 400);
+				var rqrd = ['app_id','scopes','user_id','scope_token']
+					, rst;
+				if(!(rst = kiel.utils.required_fields(rqrd,req.get_args)).stat){
+					kiel.response(req, res, {data : "Missing fields ["+rst.field+']'}, 500);
 					return;
-				}	
-				find_app(null,req,res,req.get_args.app_id,generate_request_token);
+				}
+				find_app(null,req,res,req.get_args,generate_request_token);
 			} ,
 			access_token : function (req,res) {
-				var rqrd = ['app_id','request_token','user_id'];
-				if(!kiel.utils.required_fields(rqrd,req.get_args)) {
-					kiel.response(req, res, {data : "Missing fields"}, 400);
+				var rqrd = ['app_id','request_token','user_id']
+					, rst;
+				if(!(rst = kiel.utils.required_fields(rqrd,req.get_args)).stat){
+					kiel.response(req, res, {data : "Missing fields ["+rst.field+']'}, 500);
 					return;
 				}
 				generate_access_token(req,res);
+			} ,
+			has_scopes : function(req,res) {
+				//any form of auth server
+				//https:freedom_auth.com/has_scopes?access_token=&scopes=web.view,users.add
+				var rqrd = ['access_token','scopes'];
+
+				kiel.response(req,res,{has_access: false}, 403);
+				kiel.response(req,res,{has_access: true, access_token: access_token}, 200);
 			}
 		},
 
 		post : {
 			login : function(req,res) {
-				var rqrd = ['email','app_id','source'];
-				if(!kiel.utils.required_fields(rqrd,req.post_args)) {
-					kiel.response(req, res, {data : "Missing fields"}, 400);
+				var rqrd = ['email','app_id','source']
+					, rst;
+				if(!(rst = kiel.utils.required_fields(rqrd,req.post_args)).stat){
+					kiel.response(req, res, {data : "Missing fields ["+rst.field+']'}, 500);
 					return;
 				}
-				find_app(null,req,res,req.post_args.app_id,login_check);
+				find_app(null,req,res,req.post_args,login_check);
 			} , 
 			logout : function(req,res) {
-				var rqrd = ['access_token','app_id'];
-				if(!kiel.utils.required_fields(rqrd,req.post_args)) {
-					kiel.response(req, res, {data : "Missing fields"}, 400);
+				var rqrd = ['access_token','app_id']
+					, rst;
+				if(!(rst = kiel.utils.required_fields(rqrd,req.post_args)).stat){
+					kiel.response(req, res, {data : "Missing fields ["+rst.field+']'}, 500);
 					return;
 				}
 				db._instance().collection('access_tokens',function(err,_collection) {
-					if(!kiel.utils.required_fields(rqrd,req.post_args)) {
-						kiel.response(req, res, {data : "Missing fields"}, 400);
-						return;
-					}
+					if(err) {kiel.response(req, res, {data : err}, 500);return;}	
 					_collection.remove({access_token:req.post_args.access_token}, function(err,d) {
-						if(!kiel.utils.required_fields(rqrd,req.post_args)) {
-							kiel.response(req, res, {data : "Missing fields"}, 400);
-							return;
-						}
+						if(err) {kiel.response(req, res, {data : err}, 500);return;}	
 						db._instance().collection('oauth_session_scopes',function(err,_collection) {
 							_collection.remove({access_token:req.post_args.access_token}, function(err,d) {
 							});
@@ -371,7 +419,30 @@ auth = function(kiel){
 		}, 
 
 		put : {
-			
+			add_self_scopes : function(req,res) {
+				var rqrd = ['access_token','user_id','scopes']
+					, rst
+					, scopes = ['self.edit'];
+				if(!(rst = kiel.utils.required_fields(rqrd,req.put_args)).stat){
+					kiel.response(req, res, {data : "Missing fields ["+rst.field+']'}, 500);
+					return;
+				}
+				kiel.utils.has_scopes(scopes,req.put_args.access_token,function(err,d){
+					if(err){ kiel.response(req, res, {data : err.message}, err.response_code); return; }	
+					if(req.put_args.user_id !== d.user_id) {
+						kiel.response(req, res, {data : "Invalid user_id for access_token!"}, 404);
+						return;
+					}
+					d['scopes'] = req.put_args.scopes;
+					find_app(null,req,res,d,add_scopes);
+				});
+
+			} , 
+			admin_add_scopes : function(req,res) {
+				kiel.utils.has_scopes(scopes,req.get_args.access_token,function(err,d){
+
+				});
+			}
 		},
 
 		delete : {

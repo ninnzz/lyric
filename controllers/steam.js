@@ -122,13 +122,13 @@ steam = function(kiel){
 			}
 			query_string = q_arr.join('&');
 			// kiel.logger(d.getTime()+' '+match_history+'?'+query_string,'steam_mine_match_history_index');
-			
+
 			curl(match_history+'?'+query_string ,function(err,rs,body){
 				if(!err && rs.statusCode == 200){
 					body = JSON.parse(body);
-					
+
 					if(body.result.status == 1) {
-				
+
 						for(var match in body.result.matches) {
 							if(body.result.matches[match]) {
 								db._instance().collection('dota2_matches', function(err,_collection) {
@@ -151,7 +151,7 @@ steam = function(kiel){
 		}
 		, extract_fields = function(data,parent,prefix) {
 			var arr = {};
-			
+
 			for(var i in data) {
 				if(typeof(data[i]) !== 'undefined'){
 					if(typeof(data[i]) === 'object') {
@@ -188,7 +188,7 @@ steam = function(kiel){
 					} else {
 						if(prefix){
 							arr[parent+'_'+i] = data[i];
-							
+
 						} else {
 							arr[i] = data[i];
 						}
@@ -212,7 +212,7 @@ steam = function(kiel){
 				var match_details_collection
 					, options = {}
 					, m_array = [];
-				
+
 				req.get_args.limit && (options['limit'] = req.get_args.limit);
 				req.get_args.offset && (options['skip'] = req.get_args.offset);
 				db._instance().collection('dota2_match_details', function(err,_collection) {
@@ -301,7 +301,7 @@ steam = function(kiel){
 											body = JSON.parse(body);
 											console.log('Fetched API data from match_details for id:'+body.result.match_id);
 											kiel.logger(d.getTime()+' Fetched API data from match_details for id:'+body.result.match_id,'dota2_match_details')
-									
+
 
 											body.result['_id'] = body.result.match_id;
 											match_details_collection.insert(body.result,function(err){

@@ -16,7 +16,7 @@ lol = function(kiel){
 						{id:21394,region:'lan'},
 						{id:237011,region:'tr'}
 					]
-						
+
 		,user_ids2 =[	{id:512874,region:'tr'},
 						{id:690287,region:'tr'},
 						{id:19887289,region:'na'},
